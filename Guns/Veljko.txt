@@ -1,0 +1,236 @@
+-- Veljko insert,delete triger--
+
+
+/* --- INSERT --- */
+
+-----------------
+-----------------
+-- TRIGER TROSKOVI --
+-----------------
+-----------------
+ 
+ 
+create trigger Troskovi_Insert
+on Troskovi
+INSTEAD OF INSERT
+AS
+BEGIN
+ 
+    if EXISTS (select 1 from inserted where RacunID IS NULL)
+    BEGIN
+        RAISERROR ('RacunID ne može biti null',16,1);
+        ROLLBACK TRANSACTION;
+        RETURN
+    end
+ 
+    if NOT EXISTS (select 1 from Racun where RacunID in (select RacunID from inserted))
+    BEGIN
+        RAISERROR ('Referenca RacunID nije validna',16,1);
+        ROLLBACK TRANSACTION;
+        RETURN
+    end
+ 
+        if EXISTS (select 1 from inserted where PredmetID IS NULL)
+    BEGIN
+        RAISERROR ('PredmetID ne može biti null',16,1);
+        ROLLBACK TRANSACTION;
+        RETURN
+    end
+ 
+    if NOT EXISTS (select 1 from Predmet where PredmetID in (select PredmetID from inserted))
+    BEGIN
+        RAISERROR ('Referenca PredmetID nije validna',16,1);
+        ROLLBACK TRANSACTION;
+        RETURN
+    end
+ 
+    insert into Troskovi(PredmetID,RacunID,Opis,Vrednost,Datum)
+    select  PredmetID,RacunID,Opis,Vrednost,Datum from inserted;
+    end
+ 
+ 
+INSERT INTO Troskovi (PredmetID, RacunID, Opis, Vrednost, Datum)
+VALUES 
+(1, null, 'Trošak 1', 500.00, '2024-01-25'),
+(2, 2, 'Trošak 2', 300.00, '2024-02-25'),
+(3, 3, 'Trošak 3', 700.00, '2024-03-25')
+ 
+ 
+-----------------
+-----------------
+-- TRIGER RACUN --
+-----------------
+-----------------
+ 
+ 
+create trigger Racun_insert
+on Racun
+INSTEAD OF INSERT
+AS
+BEGIN
+ 
+    if EXISTS (select 1 from inserted where RacunID IS NULL)
+    BEGIN
+        RAISERROR ('RacunID ne može biti null',16,1);
+        ROLLBACK TRANSACTION;
+        RETURN
+    end
+ 
+    if NOT EXISTS (select 1 from Predmet where PredmetID in (select PredmetID from inserted))
+    BEGIN
+        RAISERROR ('Referenca PredmetID nije validna',16,1);
+        ROLLBACK TRANSACTION;
+        RETURN
+    end
+ 
+ 
+    insert into Racun(PredmetID,Datum ,Zaduženje,Valuta)
+    select  PredmetID,Datum ,Zaduženje,Valuta
+    from inserted;
+    end
+ 
+    INSERT INTO Racun(PredmetID, Datum, Zaduženje, Valuta)
+VALUES(222, '2024-01-15', 1500, 'RSD')
+ 
+select * from Racun
+ 
+insert into Racun (PredmetID, Datum, Zaduženje, Valuta)
+values (1,'2024-01-15', 2000, 'RSD')
+ 
+INSERT INTO Racun (PredmetID, Datum, Zaduženje,Valuta)
+VALUES 
+(2, '2024-01-28', 1800.00,'EUR'),
+(3, '2024-01-28', 2200.00,'EUR'),
+(1, '2024-01-29', 2500.00,'EUR'),
+(3, '2024-01-30', 1900.00,'EUR'),
+(2, '2024-01-31', 2100.00,'EUR'),
+(1, '2024-02-01', 3000.00,'EUR'),
+(1, '2024-02-02', 2700.00,'EUR'),
+(2, '2024-02-03', 1850.00,'EUR'),
+(3, '2024-02-04', 2400.00,'EUR'),
+(1, '2024-02-05', 2800.00,'EUR');
+ 
+ 
+ 
+-----------------
+-----------------
+-- TRIGER STAVKE PREDMETA --
+-----------------
+-----------------
+--- proveravamo advokat predmet i racun
+ 
+ 
+create trigger Stavke_predmeta_insert
+on [dbo].[Stavke_predmeta]
+INSTEAD OF INSERT
+AS
+BEGIN
+ 
+    
+ 
+    if NOT EXISTS (select 1 from Advokat where AdvokatID in (select AdvokatID from inserted))
+    BEGIN
+        RAISERROR ('Referenca AdvokatID nije validna',16,1);
+        ROLLBACK TRANSACTION;
+        RETURN
+    end
+ 
+        if NOT EXISTS (select 1 from Predmet where PredmetID in (select PredmetID from inserted))
+    BEGIN
+        RAISERROR ('Referenca PredmetID nije validna',16,1);
+        ROLLBACK TRANSACTION;
+        RETURN
+    end
+ 
+    
+        if NOT EXISTS (select 1 from Racun where RacunID in (select RacunID from inserted))
+    BEGIN
+        RAISERROR ('Referenca PredmetID nije validna',16,1);
+        ROLLBACK TRANSACTION;
+        RETURN
+    end
+ 
+ 
+    insert into Stavke_predmeta(AdvokatID,PredmetID ,RacunID,Datum, Opis, UkupnoVreme)
+    select  AdvokatID,PredmetID ,RacunID,Datum, Opis, UkupnoVreme
+    from inserted;
+    end
+ 
+ 
+ 
+    -- Dodavanje nasumičnih podataka u Stavke_predmeta tabelu
+INSERT INTO Stavke_predmeta (AdvokatID, PredmetID, RacunID, Datum, Opis, UkupnoVreme)
+VALUES 
+(1, 1, 33, '2024-01-20', 'Stavka 1', '10h'),
+(2, 2, 2, '2024-02-20', 'Stavka 2', '8h'),
+(3, 3, 3, '2024-03-20', 'Stavka 3', '12h')
+-- Dodajte još podataka po potrebi...
+ 
+
+
+ /* --- DELETE --- */
+
+
+ -- DELETE ZA TABELU RACUN ----
+
+create TRIGGER trg_Racun_delete
+ON Racun
+INSTEAD OF DELETE
+AS
+BEGIN
+    
+
+	IF EXISTS (SELECT 1 FROM Troskovi WHERE RacunID IN (SELECT RacunID FROM deleted))
+    BEGIN
+        -- If related records exist, raise an error and rollback the transaction
+        RAISERROR ('Ne mozemo obrisati ovaj racun jer postoje troskovi vezani za njega.', 16, 1)
+        ROLLBACK TRANSACTION;
+        RETURN;
+    END
+
+    -- If no related records exist, proceed with the delete operation
+    DELETE FROM Racun
+    WHERE RacunID IN (SELECT RacunID FROM deleted);
+END;
+
+
+
+-- PROVERE ZA TABELU RACUN ----
+delete from Racun
+where RacunID=3
+
+delete from Troskovi
+where RacunID=3
+
+select * from Troskovi
+
+-- DELETE ZA TABELU PREDMET ----
+--------------------------------
+create TRIGGER trg_Predmet_delete
+ON Predmet
+INSTEAD OF DELETE
+AS
+BEGIN
+    
+
+	IF EXISTS (SELECT 1 FROM Stavke_predmeta WHERE PredmetID IN (SELECT PredmetID FROM deleted))
+    BEGIN
+        -- If related records exist, raise an error and rollback the transaction
+        RAISERROR ('Ne mozemo obrisati ovaj predmet jer postoje stavke predmeta vezane za njega.', 16, 1)
+        ROLLBACK TRANSACTION;
+        RETURN;
+    END
+
+    -- If no related records exist, proceed with the delete operation
+    DELETE FROM Predmet
+    WHERE PredmetID IN (SELECT PredmetID FROM deleted);
+END;
+
+-- PROVERE ZA TABELU PREDMET ----
+--------------------------------
+
+select * from Stavke_predmeta
+
+delete from Stavke_predmeta where PredmetID=1
+
+delete from Predmet where PredmetID=1
